@@ -1,0 +1,19 @@
+{
+  "7f7b7c2f97704c534a7bd290c86888f8": {
+    "adapt_lambda": true,
+    "adapt_lr": true,
+    "lambda_init": 1,
+    "nb_adapt_epochs": 120,
+    "nb_init_epochs": 20,
+    "init_lr": 0.001,
+    "batch_size": 256,
+    "optimizer": {
+      "type": "SGD",
+      "optim_params": {
+        "momentum": 0.9,
+        "weight_decay": 0.0005,
+        "nesterov": true
+      }
+    }
+  }
+}

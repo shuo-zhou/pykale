@@ -67,7 +67,8 @@ def main():
     # Repeat multiple times to get std
     for i in range(0, cfg.DATASET.NUM_REPEAT):
         seed = cfg.SOLVER.SEED + i * 10
-        dataset = MultiDomainAdapDataset(MultiDomainImageFolder(cfg.DATASET.ROOT, transform=transform, return_domain_label=True), random_state=seed)    
+        dataset = MultiDomainAdapDataset(MultiDomainImageFolder(cfg.DATASET.ROOT, transform=transform,
+                                                                return_domain_label=True), random_state=seed)
         set_seed(seed)  # seed_everything in pytorch_lightning did not set torch.backends.cudnn
         print(f"==> Building model for seed {seed} ......")
         # ---- setup model and logger ----
