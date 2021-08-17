@@ -11,18 +11,18 @@ from torch.utils.data.sampler import BatchSampler, RandomSampler
 
 
 class SamplingConfig:
-    def __init__(self, balance=False, class_weights=None, balance_domain=False):
+    def __init__(self, balance_class=False, class_weights=None, balance_domain=False):
         """Sampler configuration
 
         Args:
-            balance (bool, optional): If True, samples equal number of training samples for each class per batch.
+            balance_class (bool, optional): If True, samples equal number of training samples for each class per batch.
                 Defaults to False.
             class_weights (list, optional): Weights of classes if the classes are not equally weighted.
                 Defaults to None.
             balance_domain (bool, optional): If True, samples equal number of training samples for each domain per
                 batch. Defaults to False.
         """
-        if balance and class_weights is not None:
+        if balance_class and class_weights is not None:
             raise ValueError("Params 'balance' and 'weights' are incompatible")
         self._balance_class = balance_class
         self._balance_domain = balance_domain
@@ -54,9 +54,9 @@ class SamplingConfig:
 
 
 class FixedSeedSamplingConfig(SamplingConfig):
-    def __init__(self, seed=1, balance=False, class_weights=None, balance_domain=False):
+    def __init__(self, seed=1, balance_class=False, class_weights=None, balance_domain=False):
         """Sampling with fixed seed."""
-        super(FixedSeedSamplingConfig, self).__init__(balance, class_weights, balance_domain)
+        super(FixedSeedSamplingConfig, self).__init__(balance_class, class_weights, balance_domain)
         self._seed = seed
 
     def create_loader(self, dataset, batch_size):
@@ -276,7 +276,6 @@ def get_labels(dataset):
     """
     Get class labels for dataset
     """
-    from .multi_domain import MultiDomainImageFolder
 
     dataset_type = type(dataset)
     if dataset_type is torchvision.datasets.SVHN:
