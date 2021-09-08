@@ -74,8 +74,7 @@ def gradient_penalty(critic, h_s, h_t):
 
 def gaussian_kernel(data_list, kernel_mul=2.0, kernel_num=5, fix_sigma=None):
     """
-    Code from XLearn: computes the full kernel matrix,
-    which is less than optimal since we don't use all of it
+    Code from XLearn: computes the full kernel matrix, which is less than optimal since we don't use all of it
     with the linear MMD estimate.
 
     Examples:
@@ -114,11 +113,13 @@ def compute_mmd_loss(kernel_values, batch_size):
 
 
 def hsic(kx, ky, device):
-    """Perform independent test (HSIC) between two set of variables x and y.
+    """
+    Perform independent test with Hilbert-Schmidt Independence Criterion (HSIC) between two sets of variables x and y.
 
     Args:
         kx (2-D tensor): kernel matrix of x, shape (n_samples, n_samples)
         ky (2-D tensor): kernel matrix of y, shape (n_samples, n_samples)
+        device (torch.device): the desired device of returned tensor
 
     Returns:
         [tensor]: Independent test score >= 0
@@ -138,7 +139,7 @@ def hsic(kx, ky, device):
 
 
 def euclidean(x1, x2):
-    """Compute Eucliean distance
+    """Compute the Euclidean distance
 
     Args:
         x1 (torch.Tensor): variables set 1
@@ -147,8 +148,33 @@ def euclidean(x1, x2):
     Returns:
         torch.Tensor: Eucliean distance
     """
-    # n_features = x1.shape[0]
-    # if x2.shape[0] != n_features:
-    #     raise ValueError("x1, x2 are expected to have the same dimensions.")
-    # return ((x1 - x2) ** 2).sum().sqrt() / n_features
     return ((x1 - x2) ** 2).sum().sqrt()
+
+
+def _moment_k(x: torch.Tensor, domain_labels: torch.Tensor, k_order=2):
+    """Compute the k-th moment distance
+
+    Args:
+        x (torch.Tensor): input data, shape (n_samples, n_features)
+        domain_labels (torch.Tensor): labels indicating which domain the instance is from, shape (n_samples,)
+        k_order (int, optional): moment order. Defaults to 2.
+
+    Returns:
+        torch.Tensor: the k-th moment distance
+    """
+    unique_domain_ = torch.unique(domain_labels)
+    n_unique_domain_ = len(unique_domain_)
+    x_k_order = []
+    for domain_label_ in unique_domain_:
+        domain_idx = torch.where(domain_labels == domain_label_)
+        if k_order == 1:
+            x_k_order.append(x[domain_idx].mean(0))
+        else:
+            x_k_order.append(((x[domain_idx] - x[domain_idx].mean(0)) ** k_order).mean(0))
+    moment_sum = 0
+    n_pair = 0
+    for i in range(n_unique_domain_):
+        for j in range(i + 1, n_unique_domain_):
+            moment_sum += euclidean(x_k_order[i], x_k_order[j])
+            n_pair += 1
+    return moment_sum / n_pair

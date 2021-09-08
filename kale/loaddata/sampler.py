@@ -11,20 +11,20 @@ from torch.utils.data.sampler import BatchSampler, RandomSampler
 
 
 class SamplingConfig:
-    def __init__(self, balance_class=False, class_weights=None, balance_domain=False):
+    def __init__(self, balance=False, class_weights=None, balance_domain=False):
         """Sampler configuration
 
         Args:
-            balance_class (bool, optional): If True, samples equal number of training samples for each class per batch.
+            balance (bool, optional): If True, samples equal number of training samples for each class per batch.
                 Defaults to False.
             class_weights (list, optional): Weights of classes if the classes are not equally weighted.
                 Defaults to None.
             balance_domain (bool, optional): If True, samples equal number of training samples for each domain per
                 batch. Defaults to False.
         """
-        if balance_class and class_weights is not None:
+        if balance and class_weights is not None:
             raise ValueError("Params 'balance' and 'weights' are incompatible")
-        self._balance_class = balance_class
+        self._balance = balance
         self._balance_domain = balance_domain
         self._class_weights = class_weights
         self._balance_domain = balance_domain
@@ -38,7 +38,7 @@ class SamplingConfig:
             dataset (Dataset): dataset from which to load the data.
             batch_size (int): how many samples per batch to load
         """
-        if self._balance_class:
+        if self._balance:
             sampler = BalancedBatchSampler(dataset, batch_size=batch_size)
         elif self._class_weights is not None:
             sampler = ReweightedBatchSampler(dataset, batch_size=batch_size, class_weights=self._class_weights)
@@ -54,14 +54,14 @@ class SamplingConfig:
 
 
 class FixedSeedSamplingConfig(SamplingConfig):
-    def __init__(self, seed=1, balance_class=False, class_weights=None, balance_domain=False):
+    def __init__(self, seed=1, balance=False, class_weights=None, balance_domain=False):
         """Sampling with fixed seed."""
-        super(FixedSeedSamplingConfig, self).__init__(balance_class, class_weights, balance_domain)
+        super(FixedSeedSamplingConfig, self).__init__(balance, class_weights, balance_domain)
         self._seed = seed
 
     def create_loader(self, dataset, batch_size):
         """Create the data loader with fixed seed."""
-        if self._balance_class:
+        if self._balance:
             sampler = BalancedBatchSampler(dataset, batch_size=batch_size)
         elif self._class_weights is not None:
             sampler = ReweightedBatchSampler(dataset, batch_size=batch_size, class_weights=self._class_weights)
@@ -79,15 +79,6 @@ class FixedSeedSamplingConfig(SamplingConfig):
                 sub_sampler = RandomSampler(dataset, generator=torch.Generator().manual_seed(self._seed))
             sampler = BatchSampler(sub_sampler, batch_size=batch_size, drop_last=True)
         return torch.utils.data.DataLoader(dataset=dataset, batch_sampler=sampler)
-
-
-# class MultiDomainSamplingConfig:
-#     def __init__(self, seed=1, balanced_domain=True):
-#         self._balanced_domain = balanced_domain
-#
-#     def create_loader(self, dataset, batch_size):
-#         if self._balanced_domain:
-#             sampler = BalancedDomainSampler(dataset, batch_size=batch_size)
 
 
 # TODO: deterministic shuffle?
@@ -167,45 +158,6 @@ class BalancedBatchSampler(torch.utils.data.sampler.BatchSampler):
 
     def __len__(self):
         return self._n_batches
-
-
-# class BalancedDomainSampler(torch.utils.data.sampler.BatchSampler):
-#     def __init__(self, dataset: torch.utils.data.dataset.ConcatDataset, batch_size: int):
-#         domain_labels = np.array(dataset.domain_labels)
-#         unique_domains = sorted(set(domain_labels))
-#         self.n_samples = domain_labels.shape[0]
-#         n_domains = len(dataset.datasets)
-#         self.domain_idx = dict()
-#         for domain in dataset.domains:
-#             self.domain_idx[domain] = np.where(domain_labels == dataset.domain_to_idx[domain])
-#         self._n_samples_per_domain = batch_size // n_domains
-#         if self._n_samples_per_domain == 0:
-#             raise ValueError(f"batch_size should be bigger than the number of domains, got {batch_size}")
-#
-#         self._domain_iters = [
-#             InfiniteSliceIterator(np.where(domain_labels == domain_)[0], class_=domain_) for domain_ in unique_domains
-#         ]
-#
-#         batch_size = self._n_samples_per_domain * n_domains
-#         self._n_batches = self.n_samples // batch_size
-#         if self._n_batches == 0:
-#             raise ValueError(f"Dataset is not big enough to generate batches with size {batch_size}")
-#         logging.debug("K=", n_domains, "nk=", self._n_samples_per_domain)
-#         logging.debug("Batch size = ", batch_size)
-#
-#     def __iter__(self):
-#         for _ in range(self._n_batches):
-#             indices = []
-#             for domain_iter in self._domain_iters:
-#                 indices.extend(domain_iter.get(self._n_samples_per_domain))
-#             np.random.shuffle(indices)
-#             yield indices
-#
-#         for domain_iter in self._domain_iters:
-#             domain_iter.reset()
-#
-#     def __len__(self):
-#         return self._n_batches
 
 
 class ReweightedBatchSampler(torch.utils.data.sampler.BatchSampler):
