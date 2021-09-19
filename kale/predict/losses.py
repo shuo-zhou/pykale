@@ -39,7 +39,7 @@ def entropy_logits(linear_output):
 
 
 def entropy_logits_loss(linear_output):
-    """Computes entropy logits loss in semi-supervised or few-shot domain adapatation
+    """Computes entropy logits loss in semi-supervised or few-shot domain adaptation
 
     Examples:
         See FewShotDANNtrainer in kale.pipeline.domain_adapter
@@ -48,7 +48,7 @@ def entropy_logits_loss(linear_output):
 
 
 def gradient_penalty(critic, h_s, h_t):
-    """Computes gradient penelty in Wasserstein distance guided representation learning
+    """Computes gradient penalty in Wasserstein distance guided representation learning
 
     Examples:
         See WDGRLtrainer and WDGRLtrainerMod in kale.pipeline.domain_adapter
@@ -146,7 +146,7 @@ def euclidean(x1, x2):
         x2 (torch.Tensor): variables set 2
 
     Returns:
-        torch.Tensor: Eucliean distance
+        torch.Tensor: Euclidean distance
     """
     return ((x1 - x2) ** 2).sum().sqrt()
 

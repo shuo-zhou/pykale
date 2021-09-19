@@ -16,12 +16,12 @@ _C = CN()
 # Dataset
 # -----------------------------------------------------------------------------
 _C.DATASET = CN()
-_C.DATASET.ROOT = "../data"  # '/shared/tale2/Shared'
-_C.DATASET.NAME = "digits"  # dset choices=['office', 'image-clef', 'office-home']
-_C.DATASET.SOURCE = "mnist"  # s_dset_path  , help="The source dataset path list"
-_C.DATASET.TARGET = "usps"  # s_dset_path  , help="The target dataset path list"
+_C.DATASET.ROOT = "../data"  # Path to store data and results
+_C.DATASET.NAME = "digits"  # Name of datasets
+_C.DATASET.SOURCE = "mnist"  # The source dataset name
+_C.DATASET.TARGET = "usps"  # The target dataset name
 _C.DATASET.NUM_CLASSES = 10
-_C.DATASET.NUM_REPEAT = 10  # 10
+_C.DATASET.NUM_REPEAT = 10
 _C.DATASET.DIMENSION = 784
 _C.DATASET.WEIGHT_TYPE = "natural"
 _C.DATASET.SIZE_TYPE = "source"
@@ -59,10 +59,9 @@ _C.DAN.RANDOM_DIM = 1024
 # Misc options
 # ---------------------------------------------------------------------------- #
 _C.OUTPUT = CN()
-_C.OUTPUT.ROOT = "./outputs"  # output_dir
 _C.OUTPUT.VERBOSE = False  # To discuss, for HPC jobs
 _C.OUTPUT.PB_FRESH = 0  # 0 # 50 # 0 to disable  ; MAYBE make it a command line option
-_C.OUTPUT.DIR = os.path.join(_C.OUTPUT.ROOT, _C.DATASET.NAME + "_" + _C.DATASET.SOURCE + "2" + _C.DATASET.TARGET)
+_C.OUTPUT.TB_DIR = os.path.join("lightning_logs", _C.DATASET.SOURCE + "2" + _C.DATASET.TARGET)
 
 
 def get_cfg_defaults():
