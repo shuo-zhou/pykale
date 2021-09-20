@@ -72,7 +72,7 @@ def gradient_penalty(critic, h_s, h_t):
     return gradient_penalty
 
 
-def gaussian_kernel(data_list, kernel_mul=2.0, kernel_num=5, fix_sigma=None):
+def gaussian_kernel(x, kernel_mul=2.0, kernel_num=5, fix_sigma=None):
     """
     Code from XLearn: computes the full kernel matrix, which is less than optimal since we don't use all of it
     with the linear MMD estimate.
@@ -80,13 +80,12 @@ def gaussian_kernel(data_list, kernel_mul=2.0, kernel_num=5, fix_sigma=None):
     Examples:
         See DANtrainer and JANtrainer in kale.pipeline.domain_adapter
     """
-    # n_samples = int(source.size()[0]) + int(target.size()[0])
-    # total = torch.cat([source, target], dim=0)
-    total = torch.cat(data_list, dim=0)
-    n_samples = total.shape[0]
-    total0 = total.unsqueeze(0).expand(int(total.size(0)), int(total.size(0)), int(total.size(1)))
-    total1 = total.unsqueeze(1).expand(int(total.size(0)), int(total.size(0)), int(total.size(1)))
-    l2_distance = ((total0 - total1) ** 2).sum(2)
+    if type(x) == list:
+        x = torch.cat(x, dim=0)
+    n_samples = x.shape[0]
+    x0 = x.unsqueeze(0).expand(int(x.size(0)), int(x.size(0)), int(x.size(1)))
+    x1 = x.unsqueeze(1).expand(int(x.size(0)), int(x.size(0)), int(x.size(1)))
+    l2_distance = ((x0 - x1) ** 2).sum(2)
     if fix_sigma:
         bandwidth = fix_sigma
     else:
