@@ -303,7 +303,7 @@ class MFSANTrainer(BaseMultiSourceTrainer):
             phi_src = self.domain_net[src_domain].forward(phi_x[src_domain_idx])
             phi_tgt = self.domain_net[src_domain].forward(phi_x[tgt_idx])
             kernels = losses.gaussian_kernel(
-                phi_src, phi_tgt, kernel_mul=self._kernel_mul, kernel_num=self._kernel_num,
+                [phi_src, phi_tgt], kernel_mul=self._kernel_mul, kernel_num=self._kernel_num,
             )
             domain_dist += losses.compute_mmd_loss(kernels, len(phi_src))
             y_src_hat = self.classifiers[src_domain](phi_src)
