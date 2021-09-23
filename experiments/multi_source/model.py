@@ -10,7 +10,7 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from kale.pipeline.domain_adapter import Method
-import kale.pipeline.multi_source_adapter as multi_source_adapter
+import kale.pipeline.multi_domain_adapter as multi_source_adapter
 
 # from kale.embed.image_cnn import SmallCNNFeature
 from kale.embed.image_cnn import ResNet50Feature
