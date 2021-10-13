@@ -8,11 +8,12 @@
 
 -----------------------------------------
 
-![tests](https://github.com/pykale/pykale/workflows/test/badge.svg)
+[![tests](https://github.com/pykale/pykale/workflows/test/badge.svg)](https://github.com/pykale/pykale/actions/workflows/test.yml)
 [![Documentation Status](https://readthedocs.org/projects/pykale/badge/?version=latest)](https://pykale.readthedocs.io/en/latest/?badge=latest)
 [![PyPI version](https://img.shields.io/pypi/v/pykale?color=blue)](https://pypi.org/project/pykale/)
 [![codecov](https://codecov.io/gh/pykale/pykale/branch/main/graph/badge.svg?token=jmIYPbA2le)](https://codecov.io/gh/pykale/pykale)
 [![PyPI downloads](https://pepy.tech/badge/pykale)](https://pepy.tech/project/pykale)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5557245.svg)](https://doi.org/10.5281/zenodo.5557245)
 
 [Getting Started](https://github.com/pykale/pykale#how-to-use) |
 [Documentation](https://pykale.readthedocs.io/) |
@@ -20,9 +21,13 @@
 [Discussions](https://github.com/pykale/pykale/discussions) |
 [Changelog](https://github.com/pykale/pykale/tree/main/.github/CHANGELOG.md)
 
- PyKale is a [PyTorch](https://pytorch.org/) library for [multimodal learning](https://en.wikipedia.org/wiki/Multimodal_learning) and [transfer learning](https://en.wikipedia.org/wiki/Transfer_learning) with [deep learning](https://en.wikipedia.org/wiki/Deep_learning) and [dimensionality reduction](https://en.wikipedia.org/wiki/Dimensionality_reduction) on graphs, images, texts, and videos. By adopting a unified *pipeline-based* API design, PyKale enforces *standardization* and *minimalism*, via green machine learning concepts of *reducing* repetitions and redundancy, *reusing* existing resources, and *recycling* learning models across areas. PyKale aims to facilitate *interdisciplinary*, *knowledge-aware* machine learning research for graphs, images, texts, and videos in applications including bioinformatics, graph analysis, image/video recognition, and medical imaging. It focuses on leveraging knowledge from multiple sources for accurate and *interpretable* prediction. See our [arXiv preprint](https://arxiv.org/abs/2106.09756) and a [12-minute introduction video on YouTube](https://youtu.be/i5BYdMfbpMQ).
+PyKale is a library in the [PyTorch ecosystem](https://pytorch.org/ecosystem/) aiming to make machine learning more accessible to interdisciplinary research by bridging gaps between data, software, and end users. Both machine learning experts and end users can do better research with our accessible, scalable, and sustainable design, guided by green machine learning principles. PyKale has a unified *pipeline-based* API and focuses on [multimodal learning](https://en.wikipedia.org/wiki/Multimodal_learning) and [transfer learning](https://en.wikipedia.org/wiki/Transfer_learning) for graphs, images, texts, and videos at the moment, with supporting models on [deep learning](https://en.wikipedia.org/wiki/Deep_learning) and [dimensionality reduction](https://en.wikipedia.org/wiki/Dimensionality_reduction).
 
-#### Pipeline-based API (generic and reusable)
+PyKale enforces *standardization* and *minimalism*, via green machine learning concepts of *reducing* repetitions and redundancy, *reusing* existing resources, and *recycling* learning models across areas. PyKale will enable and accelerate *interdisciplinary*, *knowledge-aware* machine learning research for graphs, images, texts, and videos in applications including bioinformatics, graph analysis, image/video recognition, and medical imaging, with an overarching theme of leveraging knowledge from multiple sources for accurate and *interpretable* prediction.
+
+See our [arXiv preprint](https://arxiv.org/abs/2106.09756) and four short introductory videos on YouTube: [Why build PyKale?](https://youtu.be/nybYgw-T2bM) [How was PyKale built?](https://youtu.be/jaIbkjkQvYs) [What's in PyKale?](https://youtu.be/I3vifU2rcc0) and [a 5-min summary](https://youtu.be/Snou2gg7pek).
+
+#### Pipeline-based API
 
 - `loaddata` loads data from disk or online resources as input
 - `prepdata` preprocesses data to fit machine learning modules below (transforms)
@@ -34,7 +39,7 @@
 
 #### Example usage
 
-- `examples` demonstrate real applications on specific datasets.
+- `examples` demonstrate real applications on specific datasets with a standardized structure.
 
 ## How to Use
 
@@ -66,7 +71,7 @@ This is an open-source project welcoming your contributions. You can contribute 
 
 - [Star](https://docs.github.com/en/github/getting-started-with-github/saving-repositories-with-stars) and [fork](https://docs.github.com/en/github/getting-started-with-github/fork-a-repo) PyKale to follow its latest developments, share it with your networks, and [ask questions](https://github.com/pykale/pykale/discussions)  about it.
 - Use PyKale in your project and let us know any bugs (& fixes) and feature requests/suggestions via creating an [issue](https://github.com/pykale/pykale/issues).
-- Contribute via [branch, fork, and pull](https://github.com/pykale/pykale/blob/main/CONTRIBUTING.md#branch-fork-and-pull) for minor fixes and new features, functions, or examples to become one of the [contributors](https://github.com/pykale/pykale/graphs/contributors).
+- Contribute via [branch, fork, and pull](https://github.com/pykale/pykale/blob/main/.github/CONTRIBUTING.md#branch-fork-and-pull) for minor fixes and new features, functions, or examples to become one of the [contributors](https://github.com/pykale/pykale/graphs/contributors).
 
 See [contributing guidelines](https://github.com/pykale/pykale/blob/main/.github/CONTRIBUTING.md) for more details. You can also reach us via <a href="mailto:pykale-group&#64;sheffield.ac.uk">email</a> if needed. The participation in this open source project is subject to [Code of Conduct](https://github.com/pykale/pykale/blob/main/.github/CODE_OF_CONDUCT.md).
 
