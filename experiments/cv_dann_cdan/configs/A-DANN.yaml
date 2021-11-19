@@ -1,8 +1,0 @@
-DAN:
-  METHOD: 'DANN'
-DATASET:
-  ROOT: 'D:/ML_data/PACS/kfold'  # '/shared/tale2/Shared/data/PACS/raw'
-  SOURCE: ["mnist", "mnistm", "usps32"]
-  TARGET: ["svhn"]
-#  SOURCE: ['cartoon', 'photo', 'sketch']
-#  TARGET: ['art_painting']
