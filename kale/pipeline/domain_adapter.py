@@ -16,7 +16,7 @@ from torch.autograd import Function
 import kale.predict.losses as losses
 
 
-class ReverseLayerF(Function):
+class GradReverse(Function):
     """The gradient reversal layer (GRL)
 
     This is defined in the DANN paper http://jmlr.org/papers/volume17/15-239/15-239.pdf
@@ -121,9 +121,9 @@ def create_mmd_based(method: Method, dataset, feature_extractor, task_classifier
     if not method.is_mmd_method():
         raise ValueError(f"Unsupported MMD method: {method}")
     if method is Method.DAN:
-        return DANtrainer(dataset, feature_extractor, task_classifier, method=method, **train_params)
+        return DANTrainer(dataset, feature_extractor, task_classifier, method=method, **train_params)
     if method is Method.JAN:
-        return JANtrainer(
+        return JANTrainer(
             dataset,
             feature_extractor,
             task_classifier,
@@ -140,8 +140,8 @@ def create_dann_like(method: Method, dataset, feature_extractor, task_classifier
         return create_fewshot_trainer(method, dataset, feature_extractor, task_classifier, critic, **train_params)
 
     if method.is_dann_method():
-        alpha = 0 if method is Method.Source else 1
-        return DANNtrainer(
+        alpha = 0.0 if method is Method.Source else 1.0
+        return DANNTrainer(
             alpha=alpha,
             dataset=dataset,
             feature_extractor=feature_extractor,
@@ -151,7 +151,7 @@ def create_dann_like(method: Method, dataset, feature_extractor, task_classifier
             **train_params,
         )
     elif method.is_cdan_method():
-        return CDANtrainer(
+        return CDANTrainer(
             dataset=dataset,
             feature_extractor=feature_extractor,
             task_classifier=task_classifier,
@@ -161,7 +161,7 @@ def create_dann_like(method: Method, dataset, feature_extractor, task_classifier
             **train_params,
         )
     elif method is Method.WDGRL:
-        return WDGRLtrainer(
+        return WDGRLTrainer(
             dataset=dataset,
             feature_extractor=feature_extractor,
             task_classifier=task_classifier,
@@ -170,7 +170,7 @@ def create_dann_like(method: Method, dataset, feature_extractor, task_classifier
             **train_params,
         )
     elif method is Method.WDGRLMod:
-        return WDGRLtrainerMod(
+        return WDGRLTrainerMod(
             dataset=dataset,
             feature_extractor=feature_extractor,
             task_classifier=task_classifier,
@@ -189,7 +189,7 @@ def create_fewshot_trainer(method: Method, dataset, feature_extractor, task_clas
 
     if method.is_fewshot_method():
         alpha = 0 if method is Method.Source else 1
-        return FewShotDANNtrainer(
+        return FewShotDANNTrainer(
             alpha=alpha,
             dataset=dataset,
             feature_extractor=feature_extractor,
@@ -203,6 +203,49 @@ def create_fewshot_trainer(method: Method, dataset, feature_extractor, task_clas
 
 
 class BaseAdaptTrainer(pl.LightningModule):
+    r"""Base class for all domain adaptation architectures.
+
+    This class implements the classic building blocks used in all the derived architectures
+    for domain adaptation.
+    If you inherit from this class, you will have to implement only:
+        - a forward pass
+        - a `compute_loss` function that returns the task loss :math:`\mathcal{L}_c` and adaptation loss
+        :math:`\mathcal{L}_a`, as well as a dictionary for summary statistics and other metrics you may want to have
+        access to.
+
+    The default training step uses only the task loss :math:`\mathcal{L}_c` during warmup,
+    then uses the loss defined as:
+
+    :math:`\mathcal{L} = \mathcal{L}_c + \lambda \mathcal{L}_a`,
+
+    where :math:`\lambda` will follow the schedule defined by the DANN paper:
+
+    :math:`\lambda_p = \frac{2}{1 + \exp{(-\gamma \cdot p)}} - 1` where :math:`p` the learning progress
+    changes linearly from 0 to 1.
+
+    Args:
+        dataset (kale.loaddata.multi_domain): the multi-domain datasets to be used for train, validation, and tests.
+        feature_extractor (torch.nn.Module): the feature extractor network (mapping inputs :math:`x\in\mathcal{X}`
+            to a latent space :math:`\mathcal{Z}`,)
+        task_classifier (torch.nn.Module): the task classifier network that learns to predict labels
+            :math:`y \in \mathcal{Y}` from latent vectors,
+        method (Method, optional): the method implemented by the class. Defaults to None.
+            Mostly useful when several methods may be implemented using the same class.
+        lambda_init (float, optional): Weight attributed to the adaptation part of the loss. Defaults to 1.0.
+        adapt_lambda (bool, optional): Whether to make lambda grow from 0 to 1 following the schedule from
+            the DANN paper. Defaults to True.
+        adapt_lr (bool, optional): Whether to use the schedule for the learning rate as defined
+            in the DANN paper. Defaults to True.
+        nb_init_epochs (int, optional): Number of warmup epochs (during which lambda=0, training only on the source). Defaults to 10.
+        nb_adapt_epochs (int, optional): Number of training epochs. Defaults to 50.
+        batch_size (int, optional): Defaults to 32.
+        init_lr (float, optional): Initial learning rate. Defaults to 1e-3.
+        optimizer (dict, optional): Optimizer parameters, a dictionary with 2 keys:
+            "type": a string in ("SGD", "Adam", "AdamW")
+            "optim_params": kwargs for the above PyTorch optimizer.
+            Defaults to None.
+    """
+
     def __init__(
         self,
         dataset,
@@ -218,48 +261,6 @@ class BaseAdaptTrainer(pl.LightningModule):
         init_lr: float = 1e-3,
         optimizer: dict = None,
     ):
-        r"""Base class for all domain adaptation architectures.
-
-        This class implements the classic building blocks used in all the derived architectures
-        for domain adaptation.
-        If you inherit from this class, you will have to implement only:
-         - a forward pass
-         - a `compute_loss` function that returns the task loss :math:`\mathcal{L}_c` and adaptation loss
-           :math:`\mathcal{L}_a`, as well as a dictionary for summary statistics and other metrics you may want to have
-           access to.
-
-        The default training step uses only the task loss :math:`\mathcal{L}_c` during warmup,
-        then uses the loss defined as:
-
-        :math:`\mathcal{L} = \mathcal{L}_c + \lambda \mathcal{L}_a`,
-
-        where :math:`\lambda` will follow the schedule defined by the DANN paper:
-
-        :math:`\lambda_p = \frac{2}{1 + \exp{(-\gamma \cdot p)}} - 1` where $p$ the learning progress
-        changes linearly from 0 to 1.
-
-        Args:
-            dataset (kale.loaddata.multi_domain): the multi-domain datasets to be used for train, validation, and tests.
-            feature_extractor (torch.nn.Module): the feature extractor network (mapping inputs :math:`x\in\mathcal{X}`
-                to a latent space :math:`\mathcal{Z}`,)
-            task_classifier (torch.nn.Module): the task classifier network that learns to predict labels
-                :math:`y \in \mathcal{Y}` from latent vectors,
-            method (Method, optional): the method implemented by the class. Defaults to None.
-                Mostly useful when several methods may be implemented using the same class.
-            lambda_init (float, optional): Weight attributed to the adaptation part of the loss. Defaults to 1.0.
-            adapt_lambda (bool, optional): Whether to make lambda grow from 0 to 1 following the schedule from
-                the DANN paper. Defaults to True.
-            adapt_lr (bool, optional): Whether to use the schedule for the learning rate as defined
-                in the DANN paper. Defaults to True.
-            nb_init_epochs (int, optional): Number of warmup epochs (during which lambda=0, training only on the source). Defaults to 10.
-            nb_adapt_epochs (int, optional): Number of training epochs. Defaults to 50.
-            batch_size (int, optional): Defaults to 32.
-            init_lr (float, optional): Initial learning rate. Defaults to 1e-3.
-            optimizer (dict, optional): Optimizer parameters, a dictionary with 2 keys:
-                "type": a string in ("SGD", "Adam", "AdamW")
-                "optim_params": kwargs for the above PyTorch optimizer.
-                Defaults to None.
-        """
         super().__init__()
         self._method = method
 
@@ -312,13 +313,13 @@ class BaseAdaptTrainer(pl.LightningModule):
     def forward(self, x):
         raise NotImplementedError("Forward pass needs to be defined.")
 
-    def compute_loss(self, batch, split_name="V"):
+    def compute_loss(self, batch, split_name="val"):
         """Define the loss of the model
 
         Args:
             batch (tuple): batches returned by the MultiDomainLoader.
-            split_name (str, optional): learning stage (one of ["T", "V", "Te"]).
-                Defaults to "V" for validation. "T" is for training and "Te" for test.
+            split_name (str, optional): learning stage (one of ["train", "val", "test"]).
+                Defaults to "val" for validation. "train" is for training and "test" for testing.
                 This is currently used only for naming the metrics used for logging.
 
         Returns:
@@ -348,7 +349,7 @@ class BaseAdaptTrainer(pl.LightningModule):
         """
         self._update_batch_epoch_factors(batch_nb)
 
-        task_loss, adv_loss, log_metrics = self.compute_loss(batch, split_name="T")
+        task_loss, adv_loss, log_metrics = self.compute_loss(batch, split_name="train")
         if self.current_epoch < self._init_epochs:
             # init phase doesn't use few-shot learning
             # ad-hoc decision but makes models more comparable between each other
@@ -358,9 +359,9 @@ class BaseAdaptTrainer(pl.LightningModule):
 
         log_metrics = get_aggregated_metrics_from_dict(log_metrics)
         log_metrics.update(get_metrics_from_parameter_dict(self.get_parameters_watch_list(), loss.device))
-        log_metrics["T_total_loss"] = loss
-        log_metrics["T_adv_loss"] = adv_loss
-        log_metrics["T_task_loss"] = task_loss
+        log_metrics["train_total_loss"] = loss
+        log_metrics["train_adv_loss"] = adv_loss
+        log_metrics["train_task_loss"] = task_loss
 
         for key in log_metrics:
             self.log(key, log_metrics[key])
@@ -372,7 +373,7 @@ class BaseAdaptTrainer(pl.LightningModule):
         }
 
     def validation_step(self, batch, batch_nb):
-        task_loss, adv_loss, log_metrics = self.compute_loss(batch, split_name="V")
+        task_loss, adv_loss, log_metrics = self.compute_loss(batch, split_name="val")
         loss = task_loss + self.lamb_da * adv_loss
         log_metrics["val_loss"] = loss
         log_metrics["val_task_loss"] = task_loss
@@ -396,13 +397,13 @@ class BaseAdaptTrainer(pl.LightningModule):
     def validation_epoch_end(self, outputs):
         metrics_to_log = (
             "val_loss",
-            "V_source_acc",
-            "V_target_acc",
+            "val_source_acc",
+            "val_target_acc",
         )
         return self._validation_epoch_end(outputs, metrics_to_log)
 
     def test_step(self, batch, batch_nb):
-        task_loss, adv_loss, log_metrics = self.compute_loss(batch, split_name="Te")
+        task_loss, adv_loss, log_metrics = self.compute_loss(batch, split_name="test")
         loss = task_loss + self.lamb_da * adv_loss
         log_metrics["test_loss"] = loss
         return log_metrics
@@ -410,8 +411,8 @@ class BaseAdaptTrainer(pl.LightningModule):
     def test_epoch_end(self, outputs):
         metrics_at_test = (
             "test_loss",
-            "Te_source_acc",
-            "Te_target_acc",
+            "test_source_acc",
+            "test_target_acc",
         )
         log_dict = get_aggregated_metrics(metrics_at_test, outputs)
 
@@ -456,6 +457,8 @@ class BaseAdaptTrainer(pl.LightningModule):
 
 
 class BaseDANNLike(BaseAdaptTrainer):
+    """Common API for DANN-based methods: DANN, CDAN, CDAN+E, WDGRL, MME, FSDANN"""
+
     def __init__(
         self,
         dataset,
@@ -468,8 +471,6 @@ class BaseDANNLike(BaseAdaptTrainer):
         batch_reweighting=False,  # not used
         **base_params,
     ):
-        """Common API for DANN-based methods: DANN, CDAN, CDAN+E, WDGRL, MME, FSDANN"""
-
         super().__init__(dataset, feature_extractor, task_classifier, **base_params)
 
         self.alpha = alpha
@@ -496,7 +497,7 @@ class BaseDANNLike(BaseAdaptTrainer):
         if self._adapt_reg:
             self._entropy_reg = self._entropy_reg_init * self._grow_fact
 
-    def compute_loss(self, batch, split_name="V"):
+    def compute_loss(self, batch, split_name="val"):
         if len(batch) == 3:
             raise NotImplementedError("DANN does not support semi-supervised setting.")
         (x_s, y_s), (x_tu, y_tu) = batch
@@ -527,20 +528,20 @@ class BaseDANNLike(BaseAdaptTrainer):
             "val_loss",
             "val_task_loss",
             "val_adv_loss",
-            "V_source_acc",
-            "V_target_acc",
-            "V_source_domain_acc",
-            "V_target_domain_acc",
-            "V_domain_acc",
+            "val_source_acc",
+            "val_target_acc",
+            "val_source_domain_acc",
+            "val_target_domain_acc",
+            "val_domain_acc",
         )
         return self._validation_epoch_end(outputs, metrics_to_log)
 
     def test_epoch_end(self, outputs):
         metrics_at_test = (
             "test_loss",
-            "Te_source_acc",
-            "Te_target_acc",
-            "Te_domain_acc",
+            "test_source_acc",
+            "test_target_acc",
+            "test_domain_acc",
         )
         log_dict = get_aggregated_metrics(metrics_at_test, outputs)
 
@@ -554,7 +555,7 @@ class BaseDANNLike(BaseAdaptTrainer):
         # }
 
 
-class DANNtrainer(BaseDANNLike):
+class DANNTrainer(BaseDANNLike):
     """
     This class implements the DANN architecture from
     Ganin, Yaroslav, et al.
@@ -580,13 +581,13 @@ class DANNtrainer(BaseDANNLike):
             x = self.feat(x)
         feature = x.view(x.size(0), -1)
 
-        reverse_feature = ReverseLayerF.apply(feature, self.alpha)
+        reverse_feature = GradReverse.apply(feature, self.alpha)
         class_output = self.classifier(feature)
         adversarial_output = self.domain_classifier(reverse_feature)
         return feature, class_output, adversarial_output
 
 
-class CDANtrainer(BaseDANNLike):
+class CDANTrainer(BaseDANNLike):
     """
     Implements CDAN: Long, Mingsheng, et al. "Conditional adversarial domain adaptation."
     Advances in Neural Information Processing Systems. 2018.
@@ -623,10 +624,10 @@ class CDANtrainer(BaseDANNLike):
         class_output = self.classifier(x)
 
         # The GRL hook is applied to all inputs to the adversary
-        reverse_feature = ReverseLayerF.apply(x, self.alpha)
+        reverse_feature = GradReverse.apply(x, self.alpha)
 
         softmax_output = torch.nn.Softmax(dim=1)(class_output)
-        reverse_out = ReverseLayerF.apply(softmax_output, self.alpha)
+        reverse_out = GradReverse.apply(softmax_output, self.alpha)
 
         feature = torch.bmm(reverse_out.unsqueeze(2), reverse_feature.unsqueeze(1))
         feature = feature.view(-1, reverse_out.size(1) * reverse_feature.size(1))
@@ -640,11 +641,11 @@ class CDANtrainer(BaseDANNLike):
 
     def _compute_entropy_weights(self, logits):
         entropy = losses.entropy_logits(logits)
-        entropy = ReverseLayerF.apply(entropy, self.alpha)
+        entropy = GradReverse.apply(entropy, self.alpha)
         entropy_w = 1.0 + torch.exp(-entropy)
         return entropy_w
 
-    def compute_loss(self, batch, split_name="V"):
+    def compute_loss(self, batch, split_name="val"):
         if len(batch) == 3:
             raise NotImplementedError("CDAN does not support semi-supervised setting.")
         (x_s, y_s), (x_tu, y_tu) = batch
@@ -681,7 +682,7 @@ class CDANtrainer(BaseDANNLike):
         return task_loss, adv_loss, log_metrics
 
 
-class WDGRLtrainer(BaseDANNLike):
+class WDGRLTrainer(BaseDANNLike):
     """
     Implements WDGRL as described in
     Shen, Jian, et al.
@@ -718,7 +719,7 @@ class WDGRLtrainer(BaseDANNLike):
         adversarial_output = self.domain_classifier(x)
         return x, class_output, adversarial_output
 
-    def compute_loss(self, batch, split_name="V"):
+    def compute_loss(self, batch, split_name="val"):
         if len(batch) == 3:
             raise NotImplementedError("WDGRL does not support semi-supervised setting.")
         (x_s, y_s), (x_tu, y_tu) = batch
@@ -780,7 +781,7 @@ class WDGRLtrainer(BaseDANNLike):
         self._update_batch_epoch_factors(batch_id)
         self.critic_update_steps(batch)
 
-        task_loss, adv_loss, log_metrics = self.compute_loss(batch, split_name="T")
+        task_loss, adv_loss, log_metrics = self.compute_loss(batch, split_name="train")
         if self.current_epoch < self._init_epochs:
             # init phase doesn't use few-shot learning
             # ad-hoc decision but makes models more comparable between each other
@@ -790,8 +791,8 @@ class WDGRLtrainer(BaseDANNLike):
 
         log_metrics = get_aggregated_metrics_from_dict(log_metrics)
         log_metrics.update(get_metrics_from_parameter_dict(self.get_parameters_watch_list(), loss.device))
-        log_metrics["T_total_loss"] = loss
-        log_metrics["T_task_loss"] = task_loss
+        log_metrics["train_total_loss"] = loss
+        log_metrics["train_task_loss"] = task_loss
 
         for key in log_metrics:
             self.log(key, log_metrics[key])
@@ -822,7 +823,7 @@ class WDGRLtrainer(BaseDANNLike):
         return task_feat_optimizer
 
 
-class WDGRLtrainerMod(WDGRLtrainer):
+class WDGRLTrainerMod(WDGRLTrainer):
     """
     Implements a modified version WDGRL as described in
     Shen, Jian, et al.
@@ -864,7 +865,7 @@ class WDGRLtrainerMod(WDGRLtrainer):
 
         critic_cost = -wasserstein_distance + self._gamma * gp
 
-        log_metrics = {"T_critic_loss": critic_cost}
+        log_metrics = {"train_critic_loss": critic_cost}
 
         return {
             "loss": critic_cost,  # required, for backward pass
@@ -878,7 +879,7 @@ class WDGRLtrainerMod(WDGRLtrainer):
         if optimizer_idx == 0:
             return self.critic_update_steps(batch)
 
-        task_loss, adv_loss, log_metrics = self.compute_loss(batch, split_name="T")
+        task_loss, adv_loss, log_metrics = self.compute_loss(batch, split_name="train")
         if self.current_epoch < self._init_epochs:
             # init phase doesn't use few-shot learning
             # ad-hoc decision but makes models more comparable between each other
@@ -888,8 +889,8 @@ class WDGRLtrainerMod(WDGRLtrainer):
 
         log_metrics = get_aggregated_metrics_from_dict(log_metrics)
         log_metrics.update(get_metrics_from_parameter_dict(self.get_parameters_watch_list(), loss.device))
-        log_metrics["T_total_loss"] = loss
-        log_metrics["T_task_loss"] = task_loss
+        log_metrics["train_total_loss"] = loss
+        log_metrics["train_task_loss"] = task_loss
 
         for key in log_metrics:
             self.log(key, log_metrics[key])
@@ -945,7 +946,7 @@ class WDGRLtrainerMod(WDGRLtrainer):
         return [critic_opt, optimizer], []
 
 
-class FewShotDANNtrainer(BaseDANNLike):
+class FewShotDANNTrainer(BaseDANNLike):
     """Implements adaptations of DANN to the semi-supervised setting
 
     naive: task classifier is trained on labeled target data, in addition to source
@@ -966,12 +967,12 @@ class FewShotDANNtrainer(BaseDANNLike):
             x = self.feat(x)
         x = x.view(x.size(0), -1)
 
-        reverse_feature = ReverseLayerF.apply(x, self.alpha)
+        reverse_feature = GradReverse.apply(x, self.alpha)
         class_output = self.classifier(x)
         adversarial_output = self.domain_classifier(reverse_feature)
         return x, class_output, adversarial_output
 
-    def compute_loss(self, batch, split_name="V"):
+    def compute_loss(self, batch, split_name="val"):
         assert len(batch) == 3
         (x_s, y_s), (x_tl, y_tl), (x_tu, y_tu) = batch
         batch_size = len(y_s)
@@ -1014,11 +1015,11 @@ class FewShotDANNtrainer(BaseDANNLike):
 
 
 class BaseMMDLike(BaseAdaptTrainer):
+    """Common API for MME-based deep learning DA methods: DAN, JAN"""
+
     def __init__(
         self, dataset, feature_extractor, task_classifier, kernel_mul=2.0, kernel_num=5, **base_params,
     ):
-        """Common API for MME-based deep learning DA methods: DAN, JAN"""
-
         super().__init__(dataset, feature_extractor, task_classifier, **base_params)
 
         self._kernel_mul = kernel_mul
@@ -1034,7 +1035,7 @@ class BaseMMDLike(BaseAdaptTrainer):
     def _compute_mmd(self, phi_s, phi_t, y_hat, y_t_hat):
         raise NotImplementedError("You need to implement a MMD-loss")
 
-    def compute_loss(self, batch, split_name="V"):
+    def compute_loss(self, batch, split_name="val"):
         if len(batch) == 3:
             raise NotImplementedError("MMD does not support semi-supervised setting.")
         (x_s, y_s), (x_tu, y_tu) = batch
@@ -1058,18 +1059,18 @@ class BaseMMDLike(BaseAdaptTrainer):
     def validation_epoch_end(self, outputs):
         metrics_to_log = (
             "val_loss",
-            "V_source_acc",
-            "V_target_acc",
-            "V_domain_acc",
+            "val_source_acc",
+            "val_target_acc",
+            "val_domain_acc",
         )
         return self._validation_epoch_end(outputs, metrics_to_log)
 
     def test_epoch_end(self, outputs):
         metrics_at_test = (
             "test_loss",
-            "Te_source_acc",
-            "Te_target_acc",
-            "Te_domain_acc",
+            "test_source_acc",
+            "test_target_acc",
+            "test_domain_acc",
         )
         log_dict = get_aggregated_metrics(metrics_at_test, outputs)
 
@@ -1083,7 +1084,7 @@ class BaseMMDLike(BaseAdaptTrainer):
         # }
 
 
-class DANtrainer(BaseMMDLike):
+class DANTrainer(BaseMMDLike):
     """
     This is an implementation of DAN
     Long, Mingsheng, et al.
@@ -1102,7 +1103,7 @@ class DANtrainer(BaseMMDLike):
         return losses.compute_mmd_loss(kernels, batch_size)
 
 
-class JANtrainer(BaseMMDLike):
+class JANTrainer(BaseMMDLike):
     """
     This is an implementation of JAN
     Long, Mingsheng, et al.
