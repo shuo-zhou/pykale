@@ -114,10 +114,17 @@ class M3SDATrainer(BaseMultiSourceTrainer):
         task_classifier,
         n_classes: int,
         target_domain: str,
+        metric: str = "moment",
         k_moment: int = 3,
+        kernel_mul: float = 2.0,
+        kernel_num: int = 5,
         **base_params,
     ):
         super().__init__(dataset, feature_extractor, task_classifier, n_classes, target_domain, **base_params)
+        if metric in ["moment", "mmd", "hsic"]:
+            self.metric = metric
+        else:
+            raise ValueError("Unsupported domain distance metric %s" % metric)
         self.classifiers = dict()
         for domain_ in self.domain_to_idx.keys():
             if domain_ != target_domain:
@@ -125,6 +132,8 @@ class M3SDATrainer(BaseMultiSourceTrainer):
         # init classifiers as nn.ModuleDict, otherwise it will not be optimized
         self.classifiers = nn.ModuleDict(self.classifiers)
         self.k_moment = k_moment
+        self._kernel_mul = kernel_mul
+        self._kernel_num = kernel_num
 
     def compute_loss(self, batch, split_name="val"):
         x, y, domain_labels = batch
@@ -178,12 +187,31 @@ class M3SDATrainer(BaseMultiSourceTrainer):
         Returns:
             torch.Tensor: divergence
         """
+        domains = torch.unique(domain_labels)
+        n_domains = len(domains)
+        domain_dist = 0
+        if self.metric == "moment":
+            for i in range(self.k_moment):
+                domain_dist += losses._moment_k(x, domain_labels, i + 1)
+        elif self.metric == "mmd":
+            for i in range(n_domains - 1):
+                idx_i = torch.where(domain_labels == domains[i])
+                x_i = x[idx_i]
+                for j in range(i+1, n_domains):
+                    idx_j = torch.where(domain_labels == domains[j])
+                    x_j = x[idx_j]
+                    kernels = losses.gaussian_kernel(
+                        [x_i, x_j], kernel_mul=self._kernel_mul, kernel_num=self._kernel_num,
+                    )
+                    domain_dist += losses.compute_mmd_loss(kernels, len(x_i))
+        elif self.metric == "hsic":
+            kx = losses.gaussian_kernel([x], kernel_mul=self._kernel_mul, kernel_num=self._kernel_num)
+            domain_label_mat = one_hot(domain_labels, num_classes=n_domains)
+            domain_label_mat = domain_label_mat.float()
+            ky = torch.mm(domain_label_mat, domain_label_mat.T)
+            domain_dist += losses.hsic(kx, ky, device=self.device)
 
-        moment_loss = 0
-        for i in range(self.k_moment):
-            moment_loss += losses._moment_k(x, domain_labels, i + 1)
-
-        return moment_loss
+        return domain_dist
 
 
 class _DINTrainer(BaseMultiSourceTrainer):

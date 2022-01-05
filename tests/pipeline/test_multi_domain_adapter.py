@@ -19,7 +19,7 @@ def testing_cfg(download_path):
             "nb_adapt_epochs": 2,
             "nb_init_epochs": 1,
             "init_lr": 0.001,
-            "batch_size": 60,
+            "batch_size": 40,
             "optimizer": {"type": "SGD", "optim_params": {"momentum": 0.9, "weight_decay": 0.0005, "nesterov": True}},
         }
     }
@@ -32,9 +32,11 @@ def office_caltech_access(office_path):
 
 
 MSDA_METHODS = ["MFSAN", "M3SDA", "DIN"]
+# MERTICS = ["moment", "mmd", "hsic"]
 
 
 @pytest.mark.parametrize("method", MSDA_METHODS)
+# @pytest.mark.parametrize("metric", MERTICS)
 @pytest.mark.parametrize("input_dimension", [1, 2])
 def test_multi_source(method, input_dimension, office_caltech_access, testing_cfg):
     if method != "MFSAN" and input_dimension == 2:
@@ -56,6 +58,7 @@ def test_multi_source(method, input_dimension, office_caltech_access, testing_cf
         task_classifier=classifier_network,
         n_classes=10,
         target_domain="amazon",
+        # metric=metric,
         **train_params,
     )
     kwargs = {"limit_train_batches": 0.1, "limit_val_batches": 0.3, "limit_test_batches": 0.2}
