@@ -111,7 +111,7 @@ class Method(Enum):
 
     def allow_supervised(self):
         return self.is_fewshot_method()
-    
+
     def is_multi_source(self):
         return self in (Method.M3SDA, Method.DIN)
 

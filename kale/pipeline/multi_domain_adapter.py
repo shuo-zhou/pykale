@@ -121,7 +121,7 @@ class M3SDATrainer(BaseMultiSourceTrainer):
         **base_params,
     ):
         super().__init__(dataset, feature_extractor, task_classifier, n_classes, target_domain, **base_params)
-        if metric in ["moment", "mmd", "hsic"]:
+        if metric in ["moment", "mmd_ovo", "mmd_ovt", "hsic"]:
             self.metric = metric
         else:
             raise ValueError("Unsupported domain distance metric %s" % metric)
@@ -193,17 +193,30 @@ class M3SDATrainer(BaseMultiSourceTrainer):
         if self.metric == "moment":
             for i in range(self.k_moment):
                 domain_dist += losses._moment_k(x, domain_labels, i + 1)
-        elif self.metric == "mmd":
+        elif self.metric == "mmd_ovo":
             for i in range(n_domains - 1):
                 idx_i = torch.where(domain_labels == domains[i])
                 x_i = x[idx_i]
-                for j in range(i+1, n_domains):
+                for j in range(i + 1, n_domains):
                     idx_j = torch.where(domain_labels == domains[j])
                     x_j = x[idx_j]
                     kernels = losses.gaussian_kernel(
                         [x_i, x_j], kernel_mul=self._kernel_mul, kernel_num=self._kernel_num,
                     )
                     domain_dist += losses.compute_mmd_loss(kernels, len(x_i))
+        elif self.metric == "mmd_ovt":
+            tgt_idx = torch.where(domain_labels == self.target_label)[0]
+            x_tgt = x[tgt_idx]
+
+            for domain_ in torch.unique(domain_labels):
+                if domain_ == self.target_label:
+                    continue
+                idx_src_i = torch.where(domain_labels == domain_)[0]
+                x_src_i = x[idx_src_i]
+                kernels = losses.gaussian_kernel(
+                    [x_src_i, x_tgt], kernel_mul=self._kernel_mul, kernel_num=self._kernel_num,
+                )
+                domain_dist += losses.compute_mmd_loss(kernels, len(x_src_i))
         elif self.metric == "hsic":
             kx = losses.gaussian_kernel([x], kernel_mul=self._kernel_mul, kernel_num=self._kernel_num)
             domain_label_mat = one_hot(domain_labels, num_classes=n_domains)
@@ -252,7 +265,7 @@ class _DINTrainer(BaseMultiSourceTrainer):
         tgt_idx = torch.where(domain_labels == self.target_label)[0]
         cls_output = self.classifier(phi_x)
         # loss_dist = self._compute_domain_dist(cls_output, domain_labels)
-        
+
         loss_cls, ok_src = losses.cross_entropy_logits(cls_output[src_idx], y[src_idx])
         _, ok_tgt = losses.cross_entropy_logits(cls_output[tgt_idx], y[tgt_idx])
         # loss_cls, ok_src = self._compute_cls_loss(phi_x[src_idx], y[src_idx], domain_labels[src_idx])
