@@ -265,10 +265,10 @@ class _DINTrainer(BaseMultiSourceTrainer):
         x, y, domain_labels = batch
         # domain_labels = domain_labels.int()
         phi_x = self.forward(x)
-        loss_dist = self._compute_domain_dist(phi_x, domain_labels)
+        cls_output = self.classifier(phi_x)
+        loss_dist = self._compute_domain_dist(phi_x, cls_output, domain_labels)
         src_idx = torch.where(domain_labels != self.target_label)[0]
         tgt_idx = torch.where(domain_labels == self.target_label)[0]
-        cls_output = self.classifier(phi_x)
         # loss_dist = self._compute_domain_dist(cls_output, domain_labels)
 
         loss_cls, ok_src = losses.cross_entropy_logits(cls_output[src_idx], y[src_idx])
@@ -289,17 +289,19 @@ class _DINTrainer(BaseMultiSourceTrainer):
 
         return task_loss, loss_dist, log_metrics
 
-    def _compute_domain_dist(self, x, domain_labels):
+    def _compute_domain_dist(self, x, cls, domain_labels):
         if self.kernel == "linear":
-            kx = torch.mm(x, x.T)
+            kernel_phi = torch.mm(x, x.T)
+            kernel_cls = torch.mm(cls, cls.T)
         elif self.kernel == "gaussian":
-            kx = losses.gaussian_kernel([x], kernel_mul=self._kernel_mul, kernel_num=self._kernel_num)
+            kernel_phi = losses.gaussian_kernel([x], kernel_mul=self._kernel_mul, kernel_num=self._kernel_num)
+            kernel_cls = losses.gaussian_kernel([x], kernel_mul=self._kernel_mul, kernel_num=self._kernel_num)
         else:
             raise ValueError("Other kernels have not been implemented yet!")
         domain_label_mat = one_hot(domain_labels, num_classes=self.n_domains)
         domain_label_mat = domain_label_mat.float()
         ky = torch.mm(domain_label_mat, domain_label_mat.T)
-        return losses.hsic(kx, ky, device=self.device)
+        return losses.hsic(kernel_phi, ky, device=self.device) + losses.hsic(kernel_cls, ky, device=self)
 
 
 class MFSANTrainer(BaseMultiSourceTrainer):
@@ -319,6 +321,7 @@ class MFSANTrainer(BaseMultiSourceTrainer):
         task_classifier,
         n_classes: int,
         target_domain: str,
+        metric: str = "mmd_ovo",
         domain_feat_dim: int = 100,
         kernel_mul: float = 2.0,
         kernel_num: int = 5,
@@ -326,6 +329,10 @@ class MFSANTrainer(BaseMultiSourceTrainer):
         **base_params,
     ):
         super().__init__(dataset, feature_extractor, task_classifier, n_classes, target_domain, **base_params)
+        if metric in ["mmd_ovo", "mmd_ovt", "hsic", None]:
+            self.metric = metric
+        else:
+            raise ValueError("Unsupported domain distance metric %s" % metric)
         self.classifiers = dict()
         self.domain_net = dict()
         self.src_domains = []
