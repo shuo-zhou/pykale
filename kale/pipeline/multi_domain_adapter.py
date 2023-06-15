@@ -259,7 +259,7 @@ class _DINTrainer(BaseMultiSourceTrainer):
         #         self.classifiers[domain_] = task_classifier(self.feature_dim, self.n_class)
         # # init modules with nn.ModuleDict
         # self.classifiers = nn.ModuleDict(self.classifiers)
-        self.classifier = task_classifier(self.feature_dim, self.n_class)
+        self.classifier = task_classifier(self.feature_dim, self.n_classes)
 
     def compute_loss(self, batch, split_name="valid"):
         x, y, domain_labels = batch
