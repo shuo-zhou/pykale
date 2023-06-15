@@ -301,7 +301,7 @@ class _DINTrainer(BaseMultiSourceTrainer):
         domain_label_mat = one_hot(domain_labels, num_classes=self.n_domains)
         domain_label_mat = domain_label_mat.float()
         ky = torch.mm(domain_label_mat, domain_label_mat.T)
-        return losses.hsic(kernel_phi, ky, device=self.device) + losses.hsic(kernel_cls, ky, device=self)
+        return losses.hsic(kernel_phi, ky, device=self.device) + losses.hsic(kernel_cls, ky, device=self.device)
 
 
 class MFSANTrainer(BaseMultiSourceTrainer):
