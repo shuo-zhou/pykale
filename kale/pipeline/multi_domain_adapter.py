@@ -242,7 +242,7 @@ class _DINTrainer(BaseMultiSourceTrainer):
         task_classifier,
         n_classes: int,
         target_domain: str,
-        kernel: str = "linear",
+        kernel: str = "gaussian",
         kernel_mul: float = 2.0,
         kernel_num: int = 5,
         **base_params,
@@ -356,18 +356,41 @@ class MFSANTrainer(BaseMultiSourceTrainer):
         domain_dist = 0
         loss_cls = 0
         ok_src = []
-        for src_domain in self.src_domains:
-            src_domain_idx = torch.where(domain_labels == self.domain_to_idx[src_domain])[0]
-            phi_src = self.domain_net[src_domain].forward(phi_x[src_domain_idx])
-            phi_tgt = self.domain_net[src_domain].forward(phi_x[tgt_idx])
-            kernels = losses.gaussian_kernel(
-                [phi_src, phi_tgt], kernel_mul=self._kernel_mul, kernel_num=self._kernel_num,
-            )
-            domain_dist += losses.compute_mmd_loss(kernels, len(phi_src))
-            y_src_hat = self.classifiers[src_domain](phi_src)
-            loss_cls_, ok_src_ = losses.cross_entropy_logits(y_src_hat, y[src_domain_idx])
-            loss_cls += loss_cls_
-            ok_src.append(ok_src_)
+        if self.metric == "mmd_ovt":
+            for src_domain in self.src_domains:
+                src_domain_idx = torch.where(domain_labels == self.domain_to_idx[src_domain])[0]
+                phi_src = self.domain_net[src_domain].forward(phi_x[src_domain_idx])
+                phi_tgt = self.domain_net[src_domain].forward(phi_x[tgt_idx])
+                kernels = losses.gaussian_kernel(
+                    [phi_src, phi_tgt], kernel_mul=self._kernel_mul, kernel_num=self._kernel_num,
+                )
+                domain_dist += losses.compute_mmd_loss(kernels, len(phi_src))
+                y_src_hat = self.classifiers[src_domain](phi_src)
+                loss_cls_, ok_src_ = losses.cross_entropy_logits(y_src_hat, y[src_domain_idx])
+                loss_cls += loss_cls_
+                ok_src.append(ok_src_)
+        else:
+            domains = torch.unique(domain_labels)
+            n_domains = len(domains)
+            if self.metric == 'mmd_ovo':
+                for i in range(n_domains - 1):
+                    idx_i = torch.where(domain_labels == domains[i])
+                    x_i = x[idx_i]
+                    for j in range(i + 1, n_domains):
+                        idx_j = torch.where(domain_labels == domains[j])
+                        x_j = x[idx_j]
+                        kernels = losses.gaussian_kernel(
+                            [x_i, x_j], kernel_mul=self._kernel_mul, kernel_num=self._kernel_num,
+                        )
+                        domain_dist += losses.compute_mmd_loss(kernels, len(x_i))
+            elif self.metric == "hsic":
+                kx = losses.gaussian_kernel([x], kernel_mul=self._kernel_mul, kernel_num=self._kernel_num)
+                domain_label_mat = one_hot(domain_labels, num_classes=n_domains)
+                domain_label_mat = domain_label_mat.float()
+                ky = torch.mm(domain_label_mat, domain_label_mat.T)
+                domain_dist += losses.hsic(kx, ky, device=self.device)
+            else:
+                raise ValueError("Invalid metric: %s" % self.metric)
 
         domain_dist += self.cls_discrepancy(phi_x[tgt_idx])
         loss_cls = loss_cls / n_src
