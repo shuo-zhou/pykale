@@ -25,9 +25,10 @@ from torch_geometric.data import Data, Dataset, download_url, extract_zip
 from torch_sparse import SparseTensor
 
 from kale.evaluate.metrics import calculate_distance, DistanceMetric
+from kale.loaddata.base_dataset import BaseGraphDataset
 
 
-class MultiomicsDataset(Dataset):
+class MultiomicsDataset(BaseGraphDataset, Dataset):
     r"""The multiomics data for creating graph dataset.
     See `here <https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html>`__ in PyTorch Geometric
     for the accompanying tutorial.
@@ -65,15 +66,28 @@ class MultiomicsDataset(Dataset):
         pre_transform: Optional[Callable] = None,
         target_pre_transform: Optional[Callable] = None,
     ) -> None:
+        # Initialize BaseGraphDataset with metadata
+        BaseGraphDataset.__init__(
+            self,
+            num_classes=num_classes,
+            name=f"MultiomicsDataset_{num_modalities}modalities",
+            root=root,
+            num_modalities=num_modalities,
+            url=url,
+            random_split=random_split,
+            train_size=train_size
+        )
+        
         self._url = url
         self._raw_file_names = raw_file_names
         self._num_modalities = num_modalities
-        self._num_classes = num_classes
         self._random_split = random_split
         self._train_size = train_size
         self._target_pre_transform = target_pre_transform
         self._processed_file_names = "data.pt"
-        super().__init__(root, transform, pre_transform)
+        
+        # Initialize PyTorch Geometric Dataset
+        Dataset.__init__(self, root, transform, pre_transform)
         self._data_list = torch.load(osp.join(self.processed_dir, "data.pt"), weights_only=False)
 
     @property
@@ -243,11 +257,6 @@ class MultiomicsDataset(Dataset):
     def num_modalities(self) -> int:
         r"""Returns the number of modalities in the dataset."""
         return self._num_modalities
-
-    @property
-    def num_classes(self) -> int:
-        r"""Returns the number of classes in the dataset."""
-        return self._num_classes
 
 
 class SparseMultiomicsDataset(MultiomicsDataset):
