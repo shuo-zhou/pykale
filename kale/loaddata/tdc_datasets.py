@@ -2,10 +2,11 @@ import torch
 from tdc.multi_pred import DTI
 from torch.utils import data
 
+from kale.loaddata.base_dataset import BaseTorchDataset
 from kale.prepdata.chem_transform import integer_label_protein, integer_label_smiles
 
 
-class BindingDBDataset(data.Dataset):
+class BindingDBDataset(BaseTorchDataset, data.Dataset):
     """
     A custom dataset for loading and processing original TDC data, which is used as input data in DeepDTA model.
 
@@ -29,6 +30,15 @@ class BindingDBDataset(data.Dataset):
         drug_transform=None,
         protein_transform=None,
     ):
+        # Call parent constructor with dataset metadata
+        super().__init__(
+            name=name,
+            root=path,
+            split=split,
+            mode=mode,
+            y_log=y_log
+        )
+        
         self.data = DTI(name=name, path=path)
         self.mode = mode.lower()
         if y_log:
